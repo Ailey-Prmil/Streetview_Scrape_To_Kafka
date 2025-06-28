@@ -1,0 +1,8 @@
+__pycache__/
+venv/
+panoids*.json
+Result.html
+panoramas/
+tiles/
+cube_pano/
+images/
