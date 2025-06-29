@@ -104,16 +104,16 @@ for place in places:
     wait = WebDriverWait(edge, 20)
     rotate_button = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="compass"]/div')))
     # Get the image URL from the page
-    for i in range(50):
+    for i in range(15):
         # Save current URL
         old_url = edge.current_url
         old_lat, old_lon = get_lat_lon_from_url(old_url)
 
         # Click to rotate view slightly
         action = ActionChains(edge)
-        highlight_click(edge, rotate_button, -100, -50)
+        highlight_click(edge, rotate_button, -30, 70)
 
-        action.move_to_element_with_offset(rotate_button, -100, -50).click().perform()
+        action.move_to_element_with_offset(rotate_button, -50, 50).click().perform()
 
         # Wait for URL to change (timeout 10 seconds)
         try:
@@ -121,42 +121,52 @@ for place in places:
         except Exception as e:
             while (get_lat_lon_from_url(edge.current_url) == (old_lat, old_lon)):
                 # If URL didn't change, try clicking again
-                x_offset = random.randint(-80, -30)
-                y_offset = random.randint(-80, -30)
+                x_offset = random.randint(-50, -20)
+                y_offset = random.randint(-30, 50)
                 highlight_click(edge, rotate_button, x_offset, y_offset)
                 action.move_to_element_with_offset(rotate_button, x_offset, y_offset).click().perform()
-                time.sleep(1)  # Wait for the page to update
+                time.sleep(2)  # Wait for the page to update
             continue
 
         time.sleep(time_delay)  # Add delay to avoid clicking too fast
         url = edge.current_url
         # Download the image from the URL
-        # try:
-        url = url.strip()
-        if not url.startswith('https://www.google.com/maps/@'):
-            continue
-        image_url = url.split('!6s')[1].split('!7i')[0]
-        image_url = image_url.replace('%3D', '=').replace('%2F', '/')
-        longitude = url.split('@')[1].split(',')[0]
-        latitude = url.split('@')[1].split(',')[1]
-        while True:
-            try:
-                response = requests.get(image_url, stream=True)
-                break
-            except requests.ConnectionError:
-                print("Connection error. Trying again in 2 seconds.")
-                time.sleep(2)
-        with open(f'images\{longitude}_{latitude}.jpg' , 'wb') as out_file:
-            shutil.copyfileobj(response.raw, out_file)
+        try:
+            url = url.strip()
+            if not url.startswith('https://www.google.com/maps/@'):
+                continue
+            image_url = url.split('!6s')[1].split('!7i')[0]
+            image_url = image_url.replace('%3D', '=').replace('%2F', '/')
+            longitude = url.split('@')[1].split(',')[0]
+            latitude = url.split('@')[1].split(',')[1]
 
-        image_data = Data(
-            image_id=f"{longitude}_{latitude}.jpg",
-            latitude=float(latitude),
-            longitude=float(longitude)
-        )
-        print(f"Processed image: {image_data}")
-        # Publish the image data to Kafka
-        publish_streetview_image(image_data)
-        # except Exception as e:
-        #     print(f"Error processing URL {url}: {e}")
-        #     continue
+
+            image_ya = image_url.split('-ya')[1].split('-')[0]
+            # new_image_ya = [float(image_ya) + 30, float(image_ya), float(image_ya) - 30]
+            image_pi = 15
+            image_w = 1500
+            image_h = 900
+            image_fo = 90 # Default focal length
+            image_url_prefix = image_url.split('=')[0]
+            image_url = f"{image_url_prefix}=w{image_w}-h{image_h}-k-no-pi-{image_pi}-ya{image_ya}-ro5-fo{image_fo}"
+            while True:
+                try:
+                    response = requests.get(image_url, stream=True)
+                    break
+                except requests.ConnectionError:
+                    print("Connection error. Trying again in 2 seconds.")
+                    time.sleep(3)
+            with open(f'images\{longitude}_{latitude}.jpg' , 'wb') as out_file:
+                shutil.copyfileobj(response.raw, out_file)
+
+            image_data = Data(
+                image_id=f"{longitude}_{latitude}.jpg",
+                latitude=float(latitude),
+                longitude=float(longitude)
+            )
+            print(f"Processed image: {image_data}")
+            # Publish the image data to Kafka
+            publish_streetview_image(image_data)
+        except Exception as e:
+            print(f"Error processing URL {url}: {e}")
+            continue
